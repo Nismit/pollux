@@ -1,4 +1,4 @@
-import { NISGL, NISGLProgram, NISGLShader } from 'nisgl-ts';
+import { NISGL, NISGLProgram, NISGLBuffer } from 'nisgl-ts';
 import Vertex from './vertex';
 import Fragment from './fragment';
 
@@ -16,9 +16,8 @@ type Smooth = {
 
 export default class GL {
   private nisgl: NISGL;
-  private program: NISGLProgram | null;
-  private vartexShader: NISGLShader;
-  private fragmentShader: NISGLShader;
+  private program: NISGLProgram;
+  private indexBuffer: NISGLBuffer;
   private resolution = { width: 0, height: 0 };
   private hsvs = [{ h: 0.5, s: 0.5, v: 0.9 }];
   private smooths = [{ e1: 0.0, e2: 1.0, x: 0.5 }];
@@ -28,46 +27,33 @@ export default class GL {
     this.frameId = 0;
     this.nisgl = new NISGL(props);
     this.nisgl.clear();
-    this.vartexShader = this.nisgl.createShader(this.nisgl.context.VERTEX_SHADER)!;
-    this.vartexShader.compile(Vertex);
-    this.fragmentShader = this.nisgl.createShader(this.nisgl.context.FRAGMENT_SHADER)!;
-    this.fragmentShader.compile(Fragment(''));
+    this.program = <NISGLProgram>this.nisgl.createProgram(Vertex, Fragment(''));
+    this.program.use();
 
-    this.program = this.nisgl.createProgram();
+    const vertex_data = new Float32Array([
+      -1.0, 1.0, 0.0,
+      1.0, 1.0, 0.0,
+      -1.0, -1.0, 0.0,
+      1.0, -1.0, 0.0
+    ]);
 
-    if (this.vartexShader === null || this.fragmentShader === null || this.program === null) {
+    const vertex_index = new Int16Array(
+      [
+        0, 2, 1,
+        1, 2, 3
+      ]
+    );
+
+    const positionBuffer = <NISGLBuffer>this.nisgl.arrayBuffer(new Float32Array(vertex_data));
+    this.indexBuffer = <NISGLBuffer>this.nisgl.indexBuffer(new Int16Array(vertex_index));
+
+    if (!positionBuffer || !this.indexBuffer) {
       return;
     }
 
-    this.program.linkProgram([this.vartexShader, this.fragmentShader]);
-    this.nisgl.useProgram(this.program);
-
-    const positionBuffer = this.nisgl.createBuffer()!;
-    const indexBuffer = this.nisgl.createBuffer()!;
-    positionBuffer.createVertexPosition(
-      new Float32Array([
-        -1.0, 1.0, 0.0,
-        1.0, 1.0, 0.0,
-        -1.0, -1.0, 0.0,
-        1.0, -1.0, 0.0
-      ])
-    );
-
-    indexBuffer.createVertexIndex(
-      new Int16Array(
-        [
-          0, 2, 1,
-          1, 2, 3
-        ]
-      )
-    );
-
-    if (positionBuffer === null || indexBuffer === null) {
-      return;
-    }
-
-    this.program.setAttribute('position', 3, positionBuffer);
-    indexBuffer.bindBuffer('index');
+    positionBuffer.attrib("position", 3);
+    positionBuffer.attribPointer(this.program);
+    this.indexBuffer.bind();
 
     this.draw = this.draw.bind(this);
     this.stop = this.stop.bind(this);
@@ -119,18 +105,14 @@ export default class GL {
 
   reCompile(code: string) {
     try {
-      const tempFragment = this.nisgl.createShader(this.nisgl.context.FRAGMENT_SHADER);
-      tempFragment?.compile(Fragment(code));
+      const isCompiled = this.program.compile(Vertex, Fragment(code));
 
-      if (!tempFragment?.isCompiled || tempFragment === null) {
+      if (!isCompiled) {
         console.log('Failed Fragment Shader Compling');
         return;
       }
 
-      this.nisgl.context.detachShader(this.program!.getProgram, this.fragmentShader.getShader());
-      this.fragmentShader = tempFragment;
-      this.program!.linkProgram([this.fragmentShader]);
-      this.nisgl.useProgram(this.program!);
+      this.program.use();
     } catch (e: unknown) {
       if (e instanceof Error) {
         console.log('Err:', e.message);
@@ -148,7 +130,7 @@ export default class GL {
     // Uniform
     const uniformResolution = this.program.getUniformLocation('resolution');
     if (uniformResolution && uniformResolution !== null) {
-      this.program?.uniform2fv(uniformResolution, u_resolution);
+      this.program.uniform2fv(uniformResolution, u_resolution);
     }
 
     // const uniformHsv = this.program.getUniformLocation('u_hsv');
@@ -156,8 +138,9 @@ export default class GL {
     //   this.program?.uniform3fv(uniformHsv, u_hsv);
     // }
 
-    this.nisgl.context.drawElements(this.nisgl.context.TRIANGLES, 6, this.nisgl.context.UNSIGNED_SHORT, 0);
-    this.nisgl.context.flush();
+    // this.nisgl.context.drawElements(this.nisgl.context.TRIANGLES, 6, this.nisgl.context.UNSIGNED_SHORT, 0);
+    this.indexBuffer.drawTriangles(6, 0);
+    this.nisgl.flush();
 
     this.frameId = requestAnimationFrame(this.draw);
   }
