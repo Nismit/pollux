@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "nisgl-ts": "2.0.1",
-    "preact": "10.6.6"
+    "preact": "10.7.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "2.1.7",
