@@ -8,11 +8,11 @@
   },
   "dependencies": {
     "nisgl-ts": "2.0.1",
-    "preact": "10.6.6"
+    "preact": "10.7.2"
   },
   "devDependencies": {
-    "@preact/preset-vite": "2.1.7",
-    "typescript": "4.6.2",
-    "vite": "2.8.6"
+    "@preact/preset-vite": "2.2.0",
+    "typescript": "4.7.2",
+    "vite": "2.9.9"
   }
 }
